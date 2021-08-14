@@ -13,7 +13,7 @@ The goals / steps of this project are the following:
 
 The structure of this writeup follows the steps and goals in some grouped form and in the order how I addressed them. Additionally, let me point out that I also documented and commented directly in the notebook, because I usually prefer this way of presenting:
 * [Calibration and perspective transformation](./Solution-Part1-Calibration_Perspective.ipynb)
-* [Thresholding, lane pixels and output generation](./Solution-Part2-Pixel_Lane_Output.ipynb)
+* [Thresholding, lane pixels and output generation](./Revision-Solution-Part2-Pixel_Lane_Output.ipynb)
 
 ---
 
@@ -102,7 +102,11 @@ Via the gradient thresholds one gets problems if the lane lines or markers are i
 Of course the above methods can be combined in an arbitrary fashion and each component requires parameter tuning again. For this I was following closely the examples given in course and was combining:
 1. Strong derivate in x and derivate in y
 2. Direction and length
-3. Color threshold
+3. Color threshold and strong x derivative on saturation image
+
+For parameter tuning I made myself again a small interactive widget that allowed me to scan for good candidates. 
+
+In comparison to the initial submission I added an additional x derivative check on the saturation image, mainly because in some bad frames images from the video, the shadow from the trees was very strongly present and this gave some way to filter it partially.
 
 For parameter tuning I made myself a small interactive widget that allowed me to scan for good candidates:
 
@@ -120,14 +124,18 @@ A couple of results are shown in the following pictures:
 
 After warping the thresholded image we need to detect lane pixels and fit a quadratic polynomial to determine the lane curvature and relative lane position in the next step.
 
-Detecting lane pixels from scratch is done along the following line, and a direct implementation has been given in the course material. I only did some cosmetic code modification and annoted the imporant steps in the core function ``find_lane_pixels``. Please see the notebook for this at [Lane Pixel & Fit section](./Solution-Part2-Pixel_Lane_Output.ipynb#Lane-Pixels-&-Fit):
+Detecting lane pixels from scratch is done along the following line, and a direct implementation has been given in the course material. I only did some cosmetic code modification and annoted the imporant steps in the core function ``find_lane_pixels``. Please see the notebook for this at[Lane Pixel & Fit section](./Revision-Solution-Part2-Pixel_Lane_Output.ipynb#Lane-Pixels-&-Fit):
 
 - First we determine the left and right bottom lane x positions using the histogram peaks in the lower part of the image, ``step a``. 
 - Using these positions as starting points we repeatedly look for pixels in a small window centered at these current positions, ``step b``. If we find sufficiently many new pixels in a given window, we take its mean x-position as the new center for the next sligind window, ``step c``. 
 - All pixels detected in these windows are lane pixels.
 
 
-Note if we have prior information about the lane positions, for instance via the fit of a previous frame, we could utilize this information rather than trying to detect lane pixels from scratch. However, I did not pursue this direction because of timing reasons.
+Note if we have prior information about the lane positions, for instance via the fit of a previous frame, we can utilize this information rather than trying to detect lane pixels from scratch. This is the second major change I did in this revision. 
+
+This utility function ``search_around_poly`` was similarly already presented in the course and my changes here are minimal (please refer to the notebook [Lane Pixel & Fit section](./Revision-Solution-Part2-Pixel_Lane_Output.ipynb#Lane-Pixels-&-Fit)); its central point is that the lane pixels are now those being in the vicinity around the prior or the previous fit, ``step A``, and not those searched via a sliding window approach. 
+
+Note that in the image plots below I employ the ``find_lane_pixel`` output as prior to show its effect; in the video this is taken to be the previous fit parameters.
 
 Once having determined the lane pixels we can directly fit a quadratic polynomial ``x = x(y)``, which can be carried out using ``np.polyfit`` function.
 
@@ -164,31 +172,35 @@ Examples of the full pipeline including these last steps are:
 
 I have processed all images provided in the ``test_images`` folder and saved the above seen output showing the essential pipeline steps in the folder ``output_images``. 
 
-A final output of the project video is  [project video output](./project_video_out.mp4). 
+A final output of the project video is [project video output](./revision_project_video_out.mp4). Note, that in this video the fit from the previous frame is used as prior in the lane pixel detection. 
 
 
 # Reflection
 
 As discussed in more detail in the main part I had some issues regarding the camera calibration and curvature computation steps. In particular, the radius computation was giving me difficulties, because this was the last part in the pipeline and I was unsure about the influence of the previous, main manual tuning steps, like perspective transformation and image thresholding. This also took me quite some time so that I also did not pursue any of the more challenging videos.
 
+Regarding the revision, I followed the suggestions by the reviewer to work on the bad frames in the video, which I additionally added to the test images and its previous bad examples to the example folder. Mainly I added an x-derivate threshold to the saturation image, further tuned the parameters of the thresholing part, and enhanced the lane pixel search via a prior to the project.
+
 
 ## Shortcomings
 
 I see the following main deficits in the pipeline:
 
-- Each frame is analyzed individual.
 - Lane fitting process is susceptible to outlier.
 - More extreme lightning, shadowing and weather conditions
 - Vertial aligned road surface changes, marks, etc.
 - Tight curves
 - Specific situations: lane change, car in front, ...
+- Parameter tuning
+- No reset mechanism; if there were some problems in the previous frame this carries on.
   
   
 ## Possible Improvements
 
 Some tricks were presented in the project description and rubric:
 
-- Use prior information to detect lane.
+- Use smarter prior information to detect lane, e.g., sometimes on.
 - Lane smoothing over multiple frames. 
 - Image processing techniques to remove small pixels.
-- Other color space informatoin.
+- Other color space information.
+- Exponential smoothing of curvature and position values
